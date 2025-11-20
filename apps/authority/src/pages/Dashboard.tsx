@@ -61,12 +61,25 @@ interface LocationData {
 interface ZoneAlert {
   touristId: string;
   zoneName: string;
+  id: string;
+  latitude: number;
+  longitude: number;
+  name: string;
+  phone: string;
+  email: string;
+  placeName:string;
   risk: string;
 }
 interface LiveAlert {
   id: number;
   message: string;
   time: string;
+  name: string;
+  phone: string;
+  latitude: number;
+  longitude: number;
+  email: string;
+  placeName:string;
   type: "zone" | "incident" | "system";
 }
 
@@ -110,7 +123,9 @@ const Dashboard: React.FC = () => {
   const boundaryLayersRef = useRef<Record<string, L.Layer>>({});
   const socketRef = useRef<Socket | null>(null);
   const heatLayerRef = useRef<any>(null);
+  const touristRef = useRef<any>({});
 
+const [uiAlerts, setUiAlerts] = useState<any[]>([]);
   const [tourists, setTourists] = useState<Record<string, LocationData>>({});
   const [liveAlerts, setLiveAlerts] = useState<LiveAlert[]>([]);
   const [recentIncidents, setRecentIncidents] = useState<Incident[]>([]);
@@ -169,66 +184,7 @@ const Dashboard: React.FC = () => {
     });
     const socket = socketRef.current;
 
-    // Tourist live locations
-//     // const onReceiveLocation = (data: LocationData) => {
-//     //   setTourists((prev) => {
-//     //     const next = { ...prev, [data.id]: data };
-//     //     setStats((s) => ({ ...s, activeTourists: Object.keys(next).length }));
-//     //     return next;
-//     //   });
-//     //   if (!mapRef.current) return;
-//     //   const mk = markersRef.current;
-//     //   if (mk[data.id]) mk[data.id].setLatLng([data.latitude, data.longitude]);
-//     //   else mk[data.id] = L.marker([data.latitude, data.longitude]).addTo(mapRef.current).bindPopup(`Tourist: ${data.id}`);
-//     // };
-    
-//     const onReceiveLocation = (raw: any) => {
-//   // Map backend → frontend
-//   const data: TouristLocation = {
-//     id: raw.id || raw.tid,
-//     latitude: raw.latitude ?? raw.lat,
-//     longitude: raw.longitude ?? raw.lng,
-//     name: raw.name,
-//     description: raw.description,
-//     destination: raw.destination,
-//     phone: raw.phone,
-//     email: raw.email,
-//     nationality: raw.nationality,
-//     status: raw.status,
-//     tripStart: raw.tripStart,
-//     tripEnd: raw.tripEnd,
-//     timestamp: raw.timestamp
-//   };
-
-//   if (!data.id || !data.latitude || !data.longitude) {
-//     console.warn("❌ Invalid tourist data received:", raw);
-//     return;
-//   }
-
-//   const latLng: [number, number] = [data.latitude, data.longitude];
-//   const mk = markersRef.current;
-
-//   const popupContent = `
-//     <div style="font-size:13px;">
-//       <b>${data.name || "Unknown Tourist"}</b><br/>
-//       <b>Phone:</b> ${data.phone || "-"}<br/>
-//       <b>Lat:</b> ${data.latitude}<br/>
-//       <b>Lng:</b> ${data.longitude}<br/>
-//       <b>Status:</b> ${data.status || "Active"}<br/>
-//     </div>
-//   `;
-
-//   if (mk[data.id]) {
-//     mk[data.id].setLatLng(latLng);
-//     mk[data.id].setPopupContent(popupContent);
-//   } else {
-//     mk[data.id] = L.marker(latLng)
-//       .addTo(mapRef.current!)
-//       .bindPopup(popupContent);
-//   }
-
-//   setTourists(prev => ({ ...prev, [data.id]: data }));
-// };
+ 
 const onReceiveLocation = (raw: any) => {
   // 1) Normalize backend → frontend structure
   const data: TouristLocation = {
@@ -283,17 +239,17 @@ const onReceiveLocation = (raw: any) => {
   }
 
   // 4) Update tourists state
-  setTourists(prev => {
-    const next = { ...prev, [data.id]: data };
+  touristRef.current[data.id] = data;
 
-    // Update stats
-    setStats(s => ({
-      ...s,
-      activeTourists: Object.keys(next).length
-    }));
+setTourists(prev => {
+  const next = { ...prev, [data.id]: data };
+  setStats(s => ({
+    ...s,
+    activeTourists: Object.keys(next).length
+  }));
+  return next;
+});
 
-    return next;
-  });
 };
 
 
@@ -323,45 +279,8 @@ const onReceiveLocation = (raw: any) => {
       setRecentIncidents(list);
       setStats((s) => ({ ...s, activeIncidents: list.filter(i => i.status !== 'resolved').length }));
     });
-    // socket.on('incident-new', (inc: Incident) => {
-    //   setRecentIncidents((prev) => [inc, ...prev]);
-    //   setLiveAlerts((prev) => [{ id: Date.now(), message: `New SOS from ${inc.touristName || inc.touristPhone || inc.touristId || 'Tourist'}`, time: new Date().toLocaleTimeString(), type: 'incident' }, ...prev]);
-    // });
-    
-//     socket.on('incident-new', async (inc: Incident) => {
 
-//   // Convert coordinates → place name
-//   const placeName = await getPlaceName(inc.latitude, inc.longitude);
 
-//   // Build readable tourist identity
-//   const touristInfo = `${inc.touristName || "Unknown Tourist"} (ID: ${inc.touristId || "N/A"})`;
-
-//   // Build full alert message
-//   const alertMessage = `
-// 🚨 SOS Alert
-// 👤 Tourist: ${touristInfo}
-// 📞 Contact: ${inc.touristPhone || "Not Provided"}
-// 📍 Location: ${placeName}
-// 🌐 Coordinates: ${inc.latitude}, ${inc.longitude}
-// 🎤 Audio: ${inc.audioUrl ? "Available" : "No Audio"}
-// 🎥 Video: ${inc.videoUrl ? "Available" : "No Video"}
-// 📸 Photo: ${inc.photoUrl ? "Available" : "No Photo"}
-// `.trim();
-
-//   // Add to lists
-//   setRecentIncidents(prev => [ { ...inc, placeName }, ...prev ]);
-
-//   setLiveAlerts(prev => [
-//     {
-//       id: Date.now(),
-//       message: alertMessage,
-//       time: new Date().toLocaleTimeString(),
-//       type: 'incident'
-//     },
-//     ...prev
-//   ]);
-
-// });
 
 
 
@@ -407,15 +326,56 @@ socket.on("incident-new", async (inc: Incident) => {
 //console.log(inc);
   setRecentIncidents((prev) => [enhancedIncident, ...prev]);
 
+  // setLiveAlerts((prev) => [
+  //   {
+  //     id: Date.now(),
+  //     message: `New SOS from ${enhancedIncident.touristName}`,
+  //     time: new Date().toLocaleTimeString(),
+  //     type: "incident",
+  //   },
+  //   ...prev,
+  // ]);
+  
   setLiveAlerts((prev) => [
-    {
-      id: Date.now(),
-      message: `New SOS from ${enhancedIncident.touristName}`,
-      time: new Date().toLocaleTimeString(),
-      type: "incident",
-    },
-    ...prev,
-  ]);
+  {
+    id: Date.now() + Math.random(),
+
+    // MAIN NOTIFICATION MESSAGE
+    message: `New SOS from ${enhancedIncident.touristName}`,
+    time: new Date().toLocaleTimeString(),
+    type: "incident",
+
+    // FULL TOURIST DATA
+    touristId: enhancedIncident.touristId,
+    touristName: enhancedIncident.touristName,
+    touristPhone: enhancedIncident.phone,
+    touristEmail: enhancedIncident.email || "",
+    touristNationality: enhancedIncident.nationality || "",
+    touristDestination: enhancedIncident.destination || "",
+    personalId: enhancedIncident.personalId || "",
+    status: enhancedIncident.status || "",
+
+    // INCIDENT LOCATION
+    latitude: enhancedIncident.location?.lat || null,
+    longitude: enhancedIncident.location?.lng || null,
+    placeName: enhancedIncident.placeName || "Unknown Location",
+
+    // MEDIA (audio, video, photo)
+    audio: enhancedIncident.media.audio || null,
+    video: enhancedIncident.media.video || null,
+    photo: enhancedIncident.media.photo || null,
+
+    // INCIDENT SPECIFIC
+    incidentType: enhancedIncident.type || "",
+    incidentDetails: enhancedIncident.details || "",
+    incidentTime: enhancedIncident.timestamp || "",
+
+    // EXTRA (if exists)
+    risk: enhancedIncident.risk || "unknown",
+  },
+  ...prev,
+]);
+
 });
 
 
@@ -515,13 +475,366 @@ socket.on("incident-new", async (inc: Incident) => {
     });
 
     // Alerts
-    socket.on("zone-alert", (data: ZoneAlert) => {
-      window.alert(`⚠️ Tourist ${data.touristId} entered zone "${data.zoneName}" (Risk: ${data.risk})`);
-      setLiveAlerts((prev) => [
-        { id: Date.now(), message: `Tourist ${data.touristId} entered ${data.zoneName}`, time: new Date().toLocaleTimeString(), type: "zone" },
-        ...prev,
-      ]);
-    });
+
+
+// socket.on("zone-alert", (data: ZoneAlert) => {
+  
+
+// const touristObject = touristRef.current;
+
+// // Get all keys (IDs)
+// const keys = Object.keys(touristObject);
+
+// // Loop and access each tourist
+// keys.forEach((key) => {
+//   const t = touristObject[key];
+// const full = {
+//     ...data,
+//     name: t?.name,
+//     phone: t?.phone,
+//     email: t?.email,
+//     nationality: t?.nationality,
+//     destination: t?.destination,
+//     status: t?.status,
+//     latitude: t?.latitude,
+//     longitude: t?.longitude,
+//     personalId: t?.personalId,
+//     tripStart: t?.tripStart,
+//     tripEnd: t?.tripEnd,
+//   };
+
+//   window.alert(
+//     "⚠️ ZONE ALERT\n\n" +
+//     `Personal Id: ${full.personalId}\n` +
+//     `Name       : ${full.name}\n` +
+//     `Phone      : ${full.phone}\n` +
+//     `Email      : ${full.email}\n` +
+//     `Latitude   : ${full.latitude}\n` +
+//     `Longitude  : ${full.longitude}\n` +
+//     `Risk Level : ${full.risk}\n\n` +
+//     "⚠ Take necessary action."
+//   );
+
+//   setLiveAlerts(prev => [
+//     {
+//       id: Date.now(),
+//       message: `Tourist ${full.touristId} entered ${data.zoneName}`,
+//       time: new Date().toLocaleTimeString(),
+//       type: "zone"
+//     },
+//     ...prev
+//   ]);
+  
+// });
+
+
+  
+// });
+
+// socket.on("zone-alert", (data: ZoneAlert) => {
+//   const touristObject = touristRef.current;
+//   const keys = Object.keys(touristObject);
+
+//   keys.forEach((key) => {
+//     const t = touristObject[key];
+
+//     const full = {
+//       ...data,
+//       name: t?.name,
+//       phone: t?.phone,
+//       email: t?.email,
+//       nationality: t?.nationality,
+//       destination: t?.destination,
+//       status: t?.status,
+//       latitude: t?.latitude,
+//       longitude: t?.longitude,
+//       personalId: t?.personalId,
+//       tripStart: t?.tripStart,
+//       tripEnd: t?.tripEnd,
+//     };
+
+//     // -------------------------------
+//     // 🔥 CUSTOM PROFESSIONAL ALERT BOX
+//     // -------------------------------
+//     const alertBox = document.createElement("div");
+//     alertBox.style.position = "fixed";
+//     alertBox.style.top = "50%";
+//     alertBox.style.left = "50%";
+//     alertBox.style.transform = "translate(-50%, -50%)";
+//     alertBox.style.background = "#ffffff";
+//     alertBox.style.width = "360px";
+
+//     alertBox.style.padding = "20px";
+//     alertBox.style.borderRadius = "14px";
+//     alertBox.style.boxShadow = "0 6px 20px rgba(0,0,0,0.25)";
+//     alertBox.style.zIndex = "9999";
+//     alertBox.style.fontFamily = "system-ui, sans-serif";
+//     alertBox.style.textAlign = "left";
+
+//     alertBox.innerHTML = `
+//       <h2 style="
+//         margin:0 0 10px 0;
+//         color:#d8000c;
+//         font-size:20px;
+//         font-weight:700;
+//       ">⚠ Zone Alert</h2>
+
+//       <div style="font-size:14px; line-height:1.5; color:#333;">
+//         <b>Personal ID:</b> ${full.personalId}<br/>
+//         <b>Name:</b> ${full.name}<br/>
+//         <b>Phone:</b> ${full.phone}<br/>
+//         <b>Email:</b> ${full.email}<br/>
+//         <b>Latitude:</b> ${full.latitude}<br/>
+//         <b>Longitude:</b> ${full.longitude}<br/>
+//         <b>Risk Level:</b> <span style="color:#d8000c;font-weight:bold;">${full.risk}</span>
+//       </div>
+
+//       <button id="close-alert-btn" style="
+//         margin-top:15px;
+//         width:100%;
+//         padding:10px;
+//         background:#d8000c;
+//         color:#fff;
+//         border:none;
+//         border-radius:8px;
+//         font-size:15px;
+//         cursor:pointer;
+//       ">Close</button>
+//     `;
+
+//     document.body.appendChild(alertBox);
+
+//     document.getElementById("close-alert-btn")!.onclick = () => {
+//       alertBox.remove();
+//     };
+
+//     // ---------------------------------
+//     // SAVE IN LIVE ALERTS
+//     // ---------------------------------
+//     // setLiveAlerts((prev) => [
+//     //   {
+//     //     id: Date.now(),
+//     //     message: `Tourist ${full.personalId} entered ${data.zoneName}`,
+//     //     time: new Date().toLocaleTimeString(),
+//     //     type: "zone",
+//     //   },
+//     //   ...prev,
+//     // ]);
+    
+//     setLiveAlerts(prev => [
+//   {
+//     id: Date.now() + Math.random(),
+//     message: `Tourist ${full.name} entered ${data.zoneName}`,
+//     time: new Date().toLocaleTimeString(),
+//     type: "zone",
+
+//     // add full tourist details here:
+//     name: full.name,
+//     phone: full.phone,
+//     email: full.email,
+//     destination: full.destination,
+//     personalId: full.personalId,
+//     latitude: full.latitude,
+//     longitude: full.longitude,
+//     risk: full.risk
+//   },
+//   ...prev
+// ]);
+
+//   });
+// });
+
+
+// --------------------
+// GLOBAL REPEATING ALERT TRACKER
+// --------------------
+const zoneAlertTimers: Record<string, NodeJS.Timeout> = {};
+// STOP alert when tourist leaves the zone
+function stopZoneAlert(full: any) {
+  const key = `${full.personalId}_${full.zoneName}`;
+  if (zoneAlertTimers[key]) {
+    clearInterval(zoneAlertTimers[key]);
+    delete zoneAlertTimers[key];
+    console.log("Zone alert stopped for:", key);
+  }
+}
+
+
+socket.on("zone-alert", (data: ZoneAlert) => {
+  const touristObject = touristRef.current;
+  if (!touristObject || Object.keys(touristObject).length === 0) return;
+
+  const keys = Object.keys(touristObject);
+  keys.forEach((key) => {
+    const t = touristObject[key];
+    if (!t) return;
+
+    const full = {
+      ...data,
+      name: t?.name || "-",
+      phone: t?.phone || "-",
+      email: t?.email || "-",
+      nationality: t?.nationality || "-",
+      destination: t?.destination || "-",
+      status: t?.status || "-",
+      latitude: t?.latitude || 0,
+      longitude: t?.longitude || 0,
+      personalId: t?.personalId || "-",
+      tripStart: t?.tripStart || "-",
+      tripEnd: t?.tripEnd || "-",
+    };
+
+    const uniqueKey = `${full.personalId}_${full.zoneName}`;
+
+    // ❌ If a timer is already running, do NOT create duplicate alerts
+    if (!zoneAlertTimers[uniqueKey]) {
+      // Start 10-minute repeating alert
+      zoneAlertTimers[uniqueKey] = setInterval(() => {
+        showZoneAlert(full);
+        saveZoneAlert(full);
+      }, 10 * 60 * 1000);
+    }
+
+    // Show alert immediately on first trigger
+    showZoneAlert(full);
+    saveZoneAlert(full);
+stopZoneAlert(data);
+
+  });
+});
+
+// -----------------------------------
+// FUNCTION: DISPLAY ALERT BOX (SAFE)
+// -----------------------------------
+function showZoneAlert(full: any) {
+  // Remove any existing alert to avoid duplicates
+  const existing = document.getElementById("active-zone-alert");
+  if (existing) existing.remove();
+
+  const alertBox = document.createElement("div");
+  alertBox.id = "active-zone-alert";
+  alertBox.style.position = "fixed";
+  alertBox.style.top = "50%";
+  alertBox.style.left = "50%";
+  alertBox.style.transform = "translate(-50%, -50%)";
+  alertBox.style.background = "#ffffff";
+  alertBox.style.width = "360px";
+  alertBox.style.padding = "20px";
+  alertBox.style.borderRadius = "14px";
+  alertBox.style.boxShadow = "0 6px 20px rgba(0,0,0,0.25)";
+  alertBox.style.zIndex = "9999";
+  alertBox.style.fontFamily = "system-ui, sans-serif";
+  alertBox.style.textAlign = "left";
+
+  alertBox.innerHTML = `
+    <h2 style="
+      margin:0 0 10px 0;
+      color:#d8000c;
+      font-size:20px;
+      font-weight:700;
+    ">⚠ Zone Alert</h2>
+
+    <div style="font-size:14px; line-height:1.5; color:#333;">
+      <b>Personal ID:</b> ${full.personalId}<br/>
+      <b>Name:</b> ${full.name}<br/>
+      <b>Phone:</b> ${full.phone}<br/>
+      <b>Email:</b> ${full.email}<br/>
+      <b>Latitude:</b> ${full.latitude}<br/>
+      <b>Longitude:</b> ${full.longitude}<br/>
+      <b>Risk Level:</b> 
+        <span style="color:#d8000c;font-weight:bold;">
+          ${full.risk || full.zoneRisk || "High"}
+        </span>
+    </div>
+
+    <button id="close-zone-alert-btn" style="
+      margin-top:15px;
+      width:100%;
+      padding:10px;
+      background:#d8000c;
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      font-size:15px;
+      cursor:pointer;
+    ">Close</button>
+  `;
+
+  document.body.appendChild(alertBox);
+
+  // Ensures click ALWAYS works
+  setTimeout(() => {
+    const btn = document.getElementById("close-zone-alert-btn");
+    if (btn) {
+      btn.onclick = () => {
+        alertBox.remove();
+      };
+    }
+  }, 100);
+}
+
+// -----------------------------------
+// FUNCTION: SAVE INTO ALERTS LIST
+// -----------------------------------
+// function saveZoneAlert(full: any) {
+//   setLiveAlerts((prev) => [
+//     {
+//       id: Date.now() + Math.random(),
+//       message: `Tourist ${full.name} entered ${full.zoneName}`,
+//       time: new Date().toLocaleTimeString(),
+//       type: "zone",
+//       name: full.name,
+//       phone: full.phone,
+//       email: full.email,
+//       destination: full.destination,
+//       personalId: full.personalId,
+//       latitude: full.latitude,
+//       longitude: full.longitude,
+//       risk: full.risk,
+//     },
+//     ...prev,
+//   ]);
+// }
+
+function saveZoneAlert(full: any) {
+  setLiveAlerts((prev) => {
+    // 🚫 Prevent duplicate zone alerts
+    const exists = prev.some(
+      (x) =>
+        x.type === "zone" &&
+        x.personalId === full.personalId &&
+        x.zoneName === full.zoneName
+    );
+
+    if (exists) return prev; // stop duplicate insert
+
+    return [
+      {
+        id: Date.now() + Math.random(),
+        message: `Tourist ${full.name} entered ${full.zoneName}`,
+        time: new Date().toLocaleTimeString(),
+        type: "zone",
+        zoneName: full.zoneName, // add zone name for duplicate checking
+
+        name: full.name,
+        phone: full.phone,
+        email: full.email,
+        destination: full.destination,
+        personalId: full.personalId,
+        latitude: full.latitude,
+        longitude: full.longitude,
+        risk: full.risk,
+      },
+      ...prev,
+    ];
+  });
+}
+function removeAlert(id) {
+  setLiveAlerts((prev) => prev.filter((a) => a.id !== id));
+}
+
+
+
 
     // Draw handlers (create/edit/delete)
     const onDrawCreated = (e: any) => {
@@ -696,113 +1009,7 @@ socket.on("incident-new", async (inc: Incident) => {
     };
   }, []);
 
-//   return (
-//     <div className="space-y-6 p-6">
-//       {/* Header */}
-//       <div className="flex justify-between items-center">
-//         <div>
-//           <h1 className="text-3xl font-bold">Authority Dashboard</h1>
-//           <p className="text-muted-foreground">Real-time monitoring</p>
-//         </div>
-//         <div className="flex items-center gap-2">
-//           <Badge className="bg-green-600 text-white">
-//             <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2" />
-//             System Online
-//           </Badge>
-//           <Button className="authority-gradient text-white">
-//             <Zap className="w-4 h-4 mr-2" /> Emergency Protocol
-//           </Button>
-//         </div>
-//       </div>
 
-//       {/* Stats */}
-//       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-//         <StatsCard title="Active Tourists" value={stats.activeTourists} change="+Live" changeType="positive" icon={Users} status="info" />
-//         <StatsCard title="Active Incidents" value={stats.activeIncidents} change="-Live" changeType="negative" icon={AlertTriangle} status="emergency" />
-//         <StatsCard title="Response Time" value={`${stats.responseTime}m`} change="-Live" changeType="positive" icon={Clock} status="success" />
-//         <StatsCard title="Officers On Duty" value={stats.officersOnDuty} change="Live" changeType="positive" icon={Shield} status="success" />
-//       </div>
-
-//       {/* Map */}
-//       <Card className={`relative ${fullscreen ? "h-screen" : "h-96"}`}>
-//         <div className="absolute top-2 right-2 z-10">
-//           <Button variant="outline" size="sm" onClick={toggleFullscreen}>
-//             {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-//           </Button>
-//         </div>
-//         <CardHeader>
-//           <CardTitle className="flex items-center gap-2">
-//             <MapPin className="w-5 h-5" /> Live Map
-//           </CardTitle>
-//           <CardDescription>Zones, Tourists, Responders, Heatmap</CardDescription>
-//         </CardHeader>
-//         <CardContent className="h-full w-full">
-//           <div ref={mapContainerRef} className="h-full w-full rounded-lg overflow-hidden" />
-//         </CardContent>
-//       </Card>
-
-//       {/* Alerts */}
-//       <Card>
-//         <CardHeader>
-//           <CardTitle className="flex items-center gap-2">
-//             <AlertTriangle className="w-5 h-5" /> Live Alerts
-//           </CardTitle>
-//           <CardDescription>Notifications from system</CardDescription>
-//         </CardHeader>
-//         <CardContent className="space-y-3">
-//           {liveAlerts.map((a) => (
-//             <div key={a.id} className="p-3 border rounded hover:bg-muted/50">
-//               <div className="flex justify-between items-start">
-//                 <div className="flex-1">
-//                   <p className="text-sm font-medium">{a.message}</p>
-//                   <p className="text-xs text-muted-foreground">{a.time}</p>
-//                 </div>
-//                 <Badge variant="outline" className="text-xs">{a.type}</Badge>
-//               </div>
-//             </div>
-//           ))}
-//           <Button variant="outline" className="w-full mt-4">View All</Button>
-//         </CardContent>
-//       </Card>
-
-//       {/* Recent Incidents */}
-//       <Card>
-//         <CardHeader>
-//           <div className="flex items-center justify-between">
-//             <div>
-//               <CardTitle className="flex items-center gap-2">
-//                 <Phone className="w-5 h-5" /> Recent Incidents
-//               </CardTitle>
-//               <CardDescription>Latest SOS / events</CardDescription>
-//             </div>
-//             <Button variant="outline">
-//               <TrendingUp className="w-4 h-4 mr-2" /> View All
-//             </Button>
-//           </div>
-//         </CardHeader>
-//         <CardContent>
-//           <div className="space-y-4">
-//             {recentIncidents.map((inc) => (
-//               <div key={inc.id} className="flex items-center justify-between p-4 border rounded hover:bg-muted/50">
-//                 <div className="flex-1">
-//                   <div className="flex items-center gap-3">
-//                     <span className="font-medium">{inc.type}</span>
-//                   </div>
-//                   <p className="text-sm text-muted-foreground">
-//   {inc.location ? `${inc.location.lat}, ${inc.location.lng}` : "Unknown location"} • {inc.time}
-// </p>
-
-//                 </div>
-//                 <div className="flex items-center gap-2">
-//                   <Button variant="outline" size="sm">View</Button>
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         </CardContent>
-//       </Card>
-//     </div>
-//   );
 
 return (
     <div className="space-y-6 p-6">
@@ -895,22 +1102,80 @@ return (
           <CardDescription>Notifications from system</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {liveAlerts.map((a) => (
-            <div
-              key={a.id}
-              className="p-3 border rounded hover:bg-muted/50 transition"
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{a.message}</p>
-                  <p className="text-xs text-muted-foreground">{a.time}</p>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {a.type}
-                </Badge>
-              </div>
-            </div>
-          ))}
+        
+{liveAlerts.map((a) => (
+  <div
+    key={a.id}
+    className="relative p-4 border rounded-lg shadow-sm bg-white dark:bg-card hover:bg-muted/50 transition space-y-2"
+  >
+    {/* ❌ Close Button */}
+    <button
+      onClick={() => removeAlert(a.id)}
+      className="absolute bottom-2 right-2 text-xs bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600"
+    >
+      ✖
+    </button>
+
+    {/* Header */}
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-sm font-semibold text-red-600">⚠ Zone Alert</p>
+        <p className="text-sm font-medium">{a.message}</p>
+        <p className="text-xs text-muted-foreground">{a.time}</p>
+      </div>
+      <Badge variant="outline" className="text-xs uppercase">
+        {a.type}
+      </Badge>
+    </div>
+
+    {/* Full Alert Details */}
+    <div className="text-xs mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+      <p><b>Name:</b> {a.name || "-"}</p>
+      <p><b>Phone:</b> {a.phone || "-"}</p>
+
+      <p><b>Email:</b> {a.email || "-"}</p>
+      <p><b>Risk:</b> {a.risk || "-"}</p>
+
+      <p><b>Latitude:</b> {a.latitude}</p>
+      <p><b>Longitude:</b> {a.longitude}</p>
+
+      <p className="col-span-2">
+        <b>Destination:</b> {a.destination || "-"}
+      </p>
+
+      <p className="col-span-2">
+        <b>Personal ID:</b> {a.personalId || "-"}
+      </p>
+    </div>
+
+    {/* Contact Tourist Buttons */}
+    <div className="mt-3 flex gap-2">
+      <a
+        href={`tel:${a.phone}`}
+        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+      >
+        📞 Call
+      </a>
+
+      <a
+        href={`https://wa.me/${a.phone?.replace("+", "")}`}
+        target="_blank"
+        className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+      >
+        💬 WhatsApp
+      </a>
+
+      <a
+        href={`mailto:${a.email}`}
+        className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-md hover:bg-purple-700 transition"
+      >
+        ✉ Email
+      </a>
+    </div>
+  </div>
+))}
+
+
           <Button variant="outline" className="w-full mt-4">
             View All
           </Button>
@@ -981,6 +1246,7 @@ return (
 
     {/* MEDIA ATTACHMENTS */}
     <div className="flex gap-2 text-xs mt-2">
+    
       {inc.media?.photo && (
         <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
           📸 Photo
